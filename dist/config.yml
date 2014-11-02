@@ -1,0 +1,11 @@
+sql:
+  host: '127.0.0.1'
+  username: 'root'
+  password: 'root'
+  database: 'crystal_auth'
+
+auth:
+  port: 444
+
+game:
+  port: 5556
