@@ -15,6 +15,7 @@ class AuthClient
     @state = 1
     @account = undefined
     @disconnected = false
+    @ticket = ''
     @ip = @socket.remoteAddress
     @key = exports.Utils.randomString 32
 
@@ -62,11 +63,24 @@ class AuthClient
           if account != undefined
             @state = 3
             @account = account
+            @send "Ad#{@account.pseudo}"
+            @send "Ac0"
+            @send "AH1;1;75;1"
+            @send "Alk0"
+            exports.ConsoleStyle.infos "Le joueur #{@account.username} est connecter !"
           else
             exports.ConsoleStyle.error "Le compte '#{username}' est introuvable"
             @send 'AlEx'
 
       when 3 # World
-        exports.ConsoleStyle.infos 'Listage des serveurs ..'
+        if packet == "Ax"
+          exports.ConsoleStyle.infos "Listage des serveurs pour le joueur #{@account.username}"
+          @send "AxK0|1,1"
+        else if packet.charAt(0) == "A" and packet.charAt(1) == "X"
+          id = packet.substring(2, 3)
+          exports.ConsoleStyle.infos "Le joueur #{@account.username} souhaite être connecté au serveur du monde (#{id})"
+          @ticket = exports.Utils.randomString 32
+          @send "AYK#{exports.App.config.game.ip}:#{exports.App.config.game.port};#{@ticket}"
+
 
 exports.Auth = new Auth()

@@ -3,11 +3,8 @@ class App
     exports.App = @
     exports.ConsoleStyle.drawAscii()
     @loadConfig()
-    exports.Database.run (err) =>
-      if err
-        exports.ConsoleStyle.error("Impossible de se connecter a la base de données")
-        return
-      @loadNetwork()
+    exports.Database.run()
+    @loadNetwork()
 
   loadConfig: ->
     exports.ConsoleStyle.infos("Lecture de la configuration ..")
@@ -15,7 +12,7 @@ class App
     yaml = require('js-yaml')
     contents = fs.readFileSync("config.yml", 'utf8')
     data = yaml.load(contents)
-    @config = data 
+    @config = data
     exports.ConsoleStyle.infos("Configuration chargée avec succées !")
 
   loadNetwork: ->

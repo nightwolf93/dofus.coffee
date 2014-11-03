@@ -31,6 +31,7 @@
       this.state = 1;
       this.account = void 0;
       this.disconnected = false;
+      this.ticket = '';
       this.ip = this.socket.remoteAddress;
       this.key = exports.Utils.randomString(32);
       this.socket.on('data', (function(_this) {
@@ -76,7 +77,7 @@
     };
 
     AuthClient.prototype.parse = function(packet) {
-      var cryptedPass, data, password, username;
+      var cryptedPass, data, id, password, username;
       if (this.disconnected) {
         return;
       }
@@ -105,7 +106,12 @@
             return function(account) {
               if (account !== void 0) {
                 _this.state = 3;
-                return _this.account = account;
+                _this.account = account;
+                _this.send("Ad" + _this.account.pseudo);
+                _this.send("Ac0");
+                _this.send("AH1;1;75;1");
+                _this.send("Alk0");
+                return exports.ConsoleStyle.infos("Le joueur " + _this.account.username + " est connecter !");
               } else {
                 exports.ConsoleStyle.error("Le compte '" + username + "' est introuvable");
                 return _this.send('AlEx');
@@ -113,7 +119,15 @@
             };
           })(this));
         case 3:
-          return exports.ConsoleStyle.infos('Listage des serveurs ..');
+          if (packet === "Ax") {
+            exports.ConsoleStyle.infos("Listage des serveurs pour le joueur " + this.account.username);
+            return this.send("AxK0|1,1");
+          } else if (packet.charAt(0) === "A" && packet.charAt(1) === "X") {
+            id = packet.substring(2, 3);
+            exports.ConsoleStyle.infos("Le joueur " + this.account.username + " souhaite être connecté au serveur du monde (" + id + ")");
+            this.ticket = exports.Utils.randomString(32);
+            return this.send("AYK" + exports.App.config.game.ip + ":" + exports.App.config.game.port + ";" + this.ticket);
+          }
       }
     };
 
@@ -165,16 +179,13 @@
   var Account, Database;
 
   Account = (function() {
-    function Account(id, username, password, pseudo, secretQuestion, secretAnswer, adminLevel, subscriptionEndDate, points) {
+    function Account(id, username, password, pseudo, email, gmlevel) {
       this.id = id;
       this.username = username;
       this.password = password;
       this.pseudo = pseudo;
-      this.secretQuestion = secretQuestion;
-      this.secretAnswer = secretAnswer;
-      this.adminLevel = adminLevel;
-      this.subscriptionEndDate = subscriptionEndDate;
-      this.points = points;
+      this.email = email;
+      this.gmlevel = gmlevel;
     }
 
     return Account;
@@ -184,45 +195,24 @@
   Database = (function() {
     function Database() {}
 
-    Database.prototype.run = function(cbOk) {
-      var mysql;
+    Database.prototype.run = function() {
+      var file, fs, sqlite3;
       exports.ConsoleStyle.infos('Tentative de connexion a la base de données ..');
-      mysql = require('mysql');
-      this.connection = mysql.createConnection({
-        host: exports.App.config.sql.host,
-        user: exports.App.config.sql.username,
-        password: exports.App.config.sql.password
-      });
-      return this.connection.connect((function(_this) {
-        return function(err) {
-          if (err) {
-            cbOk(err);
-            return;
-          }
-          return _this.connection.query('USE ' + exports.App.config.sql.database, function(err, rows, fields) {
-            exports.ConsoleStyle.infos('Connecter a la base de données !');
-            return cbOk();
-          });
-        };
-      })(this));
+      sqlite3 = require("sqlite3").verbose();
+      fs = require("fs");
+      file = "data.db";
+      this.db = new sqlite3.Database(file);
+      return exports.ConsoleStyle.infos('Connecter a la base de données !');
     };
 
     Database.prototype.getAccountByUsername = function(username, cb) {
-      return this.connection.query("SELECT * FROM accounts WHERE username='" + username + "'", (function(_this) {
-        return function(err, rows, fields) {
-          var account, row;
-          if (err) {
-            console.log(err);
+      return this.db.get("SELECT * FROM accounts WHERE username='" + username + "'", (function(_this) {
+        return function(err, row) {
+          if (row === void 0) {
             cb(void 0);
             return;
           }
-          if (rows.length > 0) {
-            row = rows[0];
-            account = new Account(row.id, row.username, row.password, row.pseudo, row.secretQuestion, row.secretAnswer, row.adminLevel, row.subscriptionEndDate, row.points);
-            return cb(account);
-          } else {
-            return cb(void 0);
-          }
+          return cb(new Account(row.id, row.username, row.password, row.pseudo, row.email, row.gmlevel));
         };
       })(this));
     };
@@ -245,15 +235,8 @@
       exports.App = this;
       exports.ConsoleStyle.drawAscii();
       this.loadConfig();
-      exports.Database.run((function(_this) {
-        return function(err) {
-          if (err) {
-            exports.ConsoleStyle.error("Impossible de se connecter a la base de données");
-            return;
-          }
-          return _this.loadNetwork();
-        };
-      })(this));
+      exports.Database.run();
+      this.loadNetwork();
     }
 
     App.prototype.loadConfig = function() {
